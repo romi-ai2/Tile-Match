@@ -1,0 +1,1427 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>십이지신 타일 매치 (Zodiac Tile Match)</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts & FontAwesome for Premium Feel -->
+  <link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <style>
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      background: radial-gradient(circle, #fffbf0 0%, #ffe9c4 100%);
+      overflow: hidden;
+      touch-action: manipulation;
+    }
+    .game-font {
+      font-family: 'Gaegu', cursive;
+    }
+    /* 3D 타일 스타일링 */
+    .tile-3d {
+      transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      box-shadow: 0 4px 0 #d97706, 0 8px 10px rgba(0, 0, 0, 0.15);
+    }
+    .tile-3d:active:not(.blocked) {
+      transform: scale(0.95) translateY(2px);
+    }
+    .tile-3d.blocked {
+      filter: brightness(0.4) contrast(0.9);
+      box-shadow: 0 4px 0 #78350f, 0 6px 8px rgba(0, 0, 0, 0.3);
+      cursor: not-allowed;
+    }
+    /* 스크롤바 숨기기 */
+    ::-webkit-scrollbar {
+      display: none;
+    }
+    /* 눈가루/폭죽 입자용 캔버스 */
+    #effect-canvas {
+      pointer-events: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 50;
+    }
+    /* 화면 흔들기 효과 */
+    @keyframes shake {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      10%, 30%, 50%, 70%, 90% { transform: translate(-4px, 2px) rotate(-1deg); }
+      20%, 40%, 60%, 80% { transform: translate(4px, -2px) rotate(1deg); }
+    }
+    .shake-anim {
+      animation: shake 0.4s ease-in-out;
+    }
+    /* 타일 슬롯 애니메이션 */
+    @keyframes slideIn {
+      from { transform: translateY(60px) scale(0.7); opacity: 0; }
+      to { transform: translateY(0) scale(1); opacity: 1; }
+    }
+    .tile-slide-in {
+      animation: slideIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.15) forwards;
+    }
+    /* 맥박(펄스) 애니메이션 */
+    .pulse-glow {
+      animation: pulseGlow 1.5s infinite;
+    }
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 10px rgba(245, 158, 11, 0.5); }
+      50% { box-shadow: 0 0 25px rgba(245, 158, 11, 0.9); }
+    }
+  </style>
+</head>
+<body class="w-screen h-screen flex justify-center items-center p-0 m-0 overflow-hidden">
+
+  <!-- 파티클 이펙트 캔버스 -->
+  <canvas id="effect-canvas"></canvas>
+
+  <!-- 메인 게임 컨테이너 (최대 모바일/태블릿 가로세로 비율 최적화 구조) -->
+  <div id="game-container" class="relative w-full max-w-md h-full md:max-w-lg bg-[#fffdf9] flex flex-col justify-between shadow-2xl border-x border-orange-100 overflow-hidden">
+    
+    <!-- ==========================================
+         1. 메인 타이틀 & 홈 화면 (Main Start Screen)
+         ========================================== -->
+    <div id="screen-main" class="absolute inset-0 z-40 flex flex-col justify-between p-6 bg-gradient-to-b from-[#ffeed6] via-[#fffaf0] to-[#ffdcb8] text-center">
+      <div class="mt-8">
+        <span class="inline-block bg-orange-200 text-orange-800 text-sm font-bold px-3 py-1 rounded-full mb-3 shadow-sm">
+          🏆 3매치 십이지신 퍼즐 🏆
+        </span>
+        <h1 class="game-font text-5xl font-black text-orange-800 drop-shadow-[0_4px_0_rgba(251,191,36,0.4)] tracking-wide leading-tight">
+          십이지신 타일 매치
+        </h1>
+        <p class="text-sm text-amber-700 mt-2 font-medium">Zodiac Tile Match Puzzle</p>
+      </div>
+
+      <!-- 메인 장식 (귀여운 동물 타일 프리뷰) -->
+      <div class="my-auto flex justify-center items-center gap-4 flex-wrap max-w-xs mx-auto py-4">
+        <!-- 움직이는 시각적 아이콘 프리뷰 -->
+        <div class="w-16 h-16 bg-white border-2 border-amber-400 rounded-2xl flex items-center justify-center text-4xl shadow-md rotate-[-6deg] animate-bounce">🐭</div>
+        <div class="w-16 h-16 bg-white border-2 border-amber-400 rounded-2xl flex items-center justify-center text-4xl shadow-md rotate-[4deg] animate-pulse">🐯</div>
+        <div class="w-16 h-16 bg-white border-2 border-amber-400 rounded-2xl flex items-center justify-center text-4xl shadow-md rotate-[-2deg]">🐰</div>
+        <div class="w-16 h-16 bg-white border-2 border-amber-400 rounded-2xl flex items-center justify-center text-4xl shadow-md rotate-[8deg] animate-bounce" style="animation-delay: 0.2s">🐉</div>
+      </div>
+
+      <div class="mb-10 space-y-4">
+        <button id="btn-start-game" class="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-extrabold text-2xl rounded-2xl shadow-[0_6px_0_#b45309] active:translate-y-1 active:shadow-[0_2px_0_#b45309] transition-all game-font">
+          게임 시작하기
+        </button>
+        <button id="btn-open-stages" class="w-full py-3 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-lg rounded-2xl border-2 border-amber-300 transition-all">
+          스테이지 선택 (<span id="main-highest-stage">1</span> / 100)
+        </button>
+        <!-- 소리 설정 퀵 토글 -->
+        <div class="flex justify-center items-center gap-6 pt-3">
+          <button id="btn-toggle-sound" class="text-amber-800 text-lg flex items-center gap-2 bg-white/70 px-4 py-2 rounded-full border border-amber-200">
+            <i class="fas fa-volume-up" id="icon-sound"></i> 소리 ON
+          </button>
+          <div class="text-xs text-amber-600">최고 점수: <span id="main-high-score" class="font-bold text-orange-600">0</span>점</div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ==========================================
+         2. 스테이지 선택 화면 (Stage Select Screen)
+         ========================================== -->
+    <div id="screen-stages" class="absolute inset-0 z-35 hidden flex flex-col justify-between p-6 bg-[#fffaf0]">
+      <!-- 상단 네비게이션 -->
+      <div class="flex justify-between items-center pb-4 border-b border-orange-100">
+        <button id="btn-back-to-main" class="w-10 h-10 flex items-center justify-center bg-white border border-amber-200 rounded-full shadow-sm text-amber-800 hover:bg-amber-50">
+          <i class="fas fa-arrow-left"></i>
+        </button>
+        <h2 class="game-font text-2xl font-bold text-amber-900">스테이지 선택</h2>
+        <div class="w-10"></div> <!-- 밸런스용 빈 공간 -->
+      </div>
+
+      <!-- 스테이지 목록 리스트 (스크롤 가능) -->
+      <div id="stage-list-container" class="flex-1 overflow-y-auto my-4 grid grid-cols-4 gap-3 p-1">
+        <!-- 동적으로 100개 스테이지 생성 -->
+      </div>
+
+      <!-- 하단 설명 및 정보 -->
+      <div class="bg-amber-50 p-3 rounded-2xl border border-amber-200 text-center">
+        <p class="text-xs text-amber-800">
+          ⭐ 획득한 총 별: <span id="total-stars-count" class="font-bold text-orange-500">0</span> / 300
+        </p>
+      </div>
+    </div>
+
+
+    <!-- ==========================================
+         3. 실제 플레이 스크린 (In-Game Screen)
+         ========================================== -->
+    <div id="screen-game" class="hidden flex-1 w-full h-full flex flex-col justify-between overflow-hidden">
+      <!-- 상단 바 헤더 UI -->
+      <div class="px-4 pt-4 pb-2 bg-gradient-to-b from-orange-50 to-white border-b border-orange-100">
+        <div class="flex justify-between items-center mb-2">
+          <div class="flex items-center gap-2">
+            <span id="btn-back-to-stages" class="cursor-pointer w-8 h-8 flex items-center justify-center bg-white border border-orange-200 rounded-full text-orange-800 text-sm hover:bg-orange-50">
+              <i class="fas fa-chevron-left"></i>
+            </span>
+            <div>
+              <h3 class="game-font text-lg font-bold text-orange-950 leading-none">
+                Stage <span id="current-stage-num">1</span>
+              </h3>
+              <span id="layer-badge" class="text-[10px] bg-orange-100 text-orange-800 font-bold px-1.5 py-0.5 rounded-md">
+                1단 구조
+              </span>
+            </div>
+          </div>
+          
+          <!-- 타이머 영역 (위급 시 붉은색 맥박 효과 적용) -->
+          <div id="timer-box" class="flex items-center gap-1.5 px-3 py-1 bg-white border-2 border-orange-200 rounded-full shadow-sm transition-colors duration-300">
+            <i class="far fa-clock text-orange-600 animate-spin" style="animation-duration: 4s;"></i>
+            <span id="game-timer" class="font-black text-lg text-orange-900 tabular-nums">02:00</span>
+          </div>
+
+          <!-- 점수 / 콤보 영역 -->
+          <div class="text-right">
+            <div class="text-[11px] text-amber-700 font-medium">SCORE</div>
+            <div id="game-score" class="font-black text-xl text-amber-900 tracking-tight">0</div>
+          </div>
+        </div>
+
+        <!-- 콤보 및 별 진척도 게이지 바 -->
+        <div class="flex items-center justify-between gap-3 bg-orange-50/50 p-1.5 rounded-lg border border-orange-100">
+          <div class="flex items-center gap-1.5">
+            <span class="inline-block px-1.5 py-0.5 bg-orange-500 text-white text-[10px] font-bold rounded-sm" id="combo-badge">COMBO</span>
+            <span class="font-black text-sm text-orange-700" id="combo-count">0</span>
+          </div>
+          <div class="flex-1 h-2 bg-orange-200 rounded-full overflow-hidden relative">
+            <div id="time-progress-bar" class="h-full bg-gradient-to-r from-amber-400 to-orange-500 transition-all duration-300" style="width: 100%"></div>
+          </div>
+          <div class="flex gap-0.5" id="live-stars">
+            <span class="text-amber-400 text-sm">★</span>
+            <span class="text-amber-400 text-sm">★</span>
+            <span class="text-amber-400 text-sm">★</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 타일 보드 보더 컨테이너 (정밀 격자 및 터치 방지 영역) -->
+      <div class="relative flex-1 w-full flex items-center justify-center p-3 overflow-hidden bg-[#fffdfa]" id="tile-board-wrapper">
+        <!-- 동적 생성되는 십이지신 타일 보드 -->
+        <div id="tile-board" class="relative w-full h-full max-w-[420px] max-h-[460px]">
+          <!-- JS에 의해 계산된 절대적 Position의 3D 타일들이 배치됩니다. -->
+        </div>
+      </div>
+
+      <!-- 하단 트레이 (매칭 대기 8칸 슬롯 및 아이템 보관함) -->
+      <div class="bg-gradient-to-t from-orange-100 to-orange-50 p-4 border-t border-orange-200">
+        
+        <!-- 8칸 타일 슬롯 슬라이드 -->
+        <div class="mb-4 text-center">
+          <div class="text-xs text-amber-800 font-bold mb-1 flex justify-between px-1">
+            <span>📥 매칭 슬롯 (최대 8칸)</span>
+            <span id="slot-indicator" class="font-normal text-amber-700">0 / 8</span>
+          </div>
+          <!-- 8칸 그리드 슬롯 트레이 -->
+          <div id="matching-slot-tray" class="w-full h-14 bg-[#eedbc2] border-2 border-amber-800/20 rounded-2xl flex items-center p-1.5 gap-1.5 relative shadow-inner">
+            <!-- 비어있는 슬롯 가이드 가이드라인 배경 선 -->
+            <div class="absolute inset-0 flex justify-between px-1.5 py-1.5 pointer-events-none opacity-25">
+              <div class="flex-1 border border-dashed border-amber-900/50 rounded-lg"></div>
+              <div class="w-1.5"></div>
+              <div class="flex-1 border border-dashed border-amber-900/50 rounded-lg"></div>
+              <div class="w-1.5"></div>
+              <div class="flex-1 border border-dashed border-amber-900/50 rounded-lg"></div>
+              <div class="w-1.5"></div>
+              <div class="flex-1 border border-dashed border-amber-900/50 rounded-lg"></div>
+              <div class="w-1.5"></div>
+              <div class="flex-1 border border-dashed border-amber-900/50 rounded-lg"></div>
+              <div class="w-1.5"></div>
+              <div class="flex-1 border border-dashed border-amber-900/50 rounded-lg"></div>
+              <div class="w-1.5"></div>
+              <div class="flex-1 border border-dashed border-amber-900/50 rounded-lg"></div>
+              <div class="w-1.5"></div>
+              <div class="flex-1 border border-dashed border-amber-900/50 rounded-lg"></div>
+            </div>
+            <!-- 실제 타일들이 동적으로 부착되는 슬롯 영역 -->
+            <div id="matching-slot-container" class="relative w-full h-full flex items-center justify-start gap-1 z-10">
+              <!-- 선택된 타일들이 여기에 가로로 가득 채워짐 -->
+            </div>
+          </div>
+        </div>
+
+        <!-- 아이템 버튼 3종 툴바 -->
+        <div class="grid grid-cols-3 gap-3">
+          <!-- 1. 섞기 아이템 -->
+          <button id="btn-item-shuffle" class="flex flex-col items-center justify-center bg-white hover:bg-amber-50 active:scale-95 border-2 border-amber-300 rounded-2xl p-2 shadow-sm transition-transform">
+            <div class="text-2xl mb-0.5">🔀</div>
+            <div class="text-xs font-black text-amber-900">전체 섞기</div>
+            <div class="text-[10px] bg-amber-200 px-2 py-0.5 rounded-full mt-1 font-bold text-amber-900" id="item-shuffle-count">1</div>
+          </button>
+          <!-- 2. 폭탄 제거 아이템 -->
+          <button id="btn-item-bomb" class="flex flex-col items-center justify-center bg-white hover:bg-amber-50 active:scale-95 border-2 border-amber-300 rounded-2xl p-2 shadow-sm transition-transform">
+            <div class="text-2xl mb-0.5">💣</div>
+            <div class="text-xs font-black text-amber-900">타일 제거</div>
+            <div class="text-[10px] bg-amber-200 px-2 py-0.5 rounded-full mt-1 font-bold text-amber-900" id="item-bomb-count">1</div>
+          </button>
+          <!-- 3. 시간 정지 아이템 -->
+          <button id="btn-item-freeze" class="flex flex-col items-center justify-center bg-white hover:bg-amber-50 active:scale-95 border-2 border-amber-300 rounded-2xl p-2 shadow-sm transition-transform">
+            <div class="text-2xl mb-0.5">⏸️</div>
+            <div class="text-xs font-black text-amber-900">시간 정지</div>
+            <div class="text-[10px] bg-amber-200 px-2 py-0.5 rounded-full mt-1 font-bold text-amber-900" id="item-freeze-count">1</div>
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ==========================================
+         4. 모달 오버레이 (Modals)
+         ========================================== -->
+    <!-- (A) 일시정지 오버레이 모달 -->
+    <div id="modal-pause" class="absolute inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-6">
+      <div class="w-full max-w-xs bg-white rounded-3xl p-6 text-center shadow-2xl border-4 border-amber-400">
+        <h3 class="game-font text-3xl font-bold text-amber-900 mb-2">일시 정지</h3>
+        <p class="text-sm text-gray-500 mb-6">게임이 잠시 멈췄습니다.</p>
+        <div class="space-y-3">
+          <button id="btn-resume" class="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl shadow-md">
+            계속 하기
+          </button>
+          <button id="btn-restart" class="w-full py-3 bg-orange-100 hover:bg-orange-200 text-orange-900 font-bold rounded-xl border border-orange-300">
+            다시 시작
+          </button>
+          <button id="btn-quit" class="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold rounded-xl">
+            메인 화면으로
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- (B) 게임오버 모달 (아쉬운 표정 이모지) -->
+    <div id="modal-gameover" class="absolute inset-0 bg-black/70 z-50 hidden flex items-center justify-center p-6">
+      <div class="w-full max-w-xs bg-white rounded-3xl p-6 text-center shadow-2xl border-4 border-red-400 animate-bounce-short">
+        <div class="text-6xl mb-3">😭</div>
+        <h3 class="game-font text-3xl font-black text-red-600 mb-1">게임 오버!</h3>
+        <p id="gameover-reason" class="text-xs text-gray-500 mb-4">시간 초과 또는 슬롯 부족</p>
+        
+        <div class="bg-red-50 p-3 rounded-xl border border-red-100 mb-6 text-center">
+          <span class="text-xs text-gray-500 block">최종 점수</span>
+          <span id="gameover-score" class="font-black text-2xl text-red-700">0</span>
+        </div>
+
+        <div class="space-y-2">
+          <button id="btn-retry-game" class="w-full py-3.5 bg-gradient-to-r from-red-500 to-orange-500 text-white font-extrabold text-lg rounded-xl shadow-md active:translate-y-0.5">
+            재도전 하기
+          </button>
+          <button id="btn-quit-gameover" class="w-full py-2.5 bg-gray-100 text-gray-700 font-bold rounded-xl text-sm">
+            메인으로
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- (C) 스테이지 클리어 축하 모달 -->
+    <div id="modal-clear" class="absolute inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-6">
+      <div class="w-full max-w-xs bg-white rounded-3xl p-6 text-center shadow-2xl border-4 border-green-400">
+        <div class="text-5xl mb-2">🎉</div>
+        <h3 class="game-font text-3xl font-black text-green-600 mb-1">STAGE CLEAR!</h3>
+        <p class="text-xs text-gray-500 mb-4">십이지신의 기운을 얻었습니다!</p>
+        
+        <!-- 별 획득 표시 -->
+        <div class="flex justify-center gap-2 my-4" id="clear-stars">
+          <span class="text-gray-300 text-4xl">★</span>
+          <span class="text-gray-300 text-4xl">★</span>
+          <span class="text-gray-300 text-4xl">★</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 bg-green-50 p-3 rounded-xl border border-green-100 mb-6 text-sm text-left">
+          <div>
+            <span class="text-xs text-gray-400">이번 점수</span>
+            <div id="clear-score-val" class="font-bold text-green-700 text-lg">0</div>
+          </div>
+          <div>
+            <span class="text-xs text-gray-400">남은 시간</span>
+            <div id="clear-time-val" class="font-bold text-amber-700 text-lg">00:00</div>
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <button id="btn-next-stage" class="w-full py-3.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-extrabold text-lg rounded-xl shadow-md active:translate-y-0.5">
+            다음 스테이지
+          </button>
+          <button id="btn-quit-clear" class="w-full py-2.5 bg-gray-100 text-gray-700 font-bold rounded-xl text-sm">
+            스테이지 맵으로
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ==========================================
+       5. 자바스크립트 엔진 (Core JS Game Controller)
+       ========================================== -->
+  <script>
+    // ==========================================
+    // A. 십이지신 동물 타일 정보 정의
+    // ==========================================
+    const ZODIAC_ANIMALS = [
+      { id: 'rat', name: '쥐', emoji: '🐭', color: '#FFF2F2' },
+      { id: 'ox', name: '소', emoji: '🐮', color: '#F0F4FF' },
+      { id: 'tiger', name: '호랑이', emoji: '🐯', color: '#FFEED6' },
+      { id: 'rabbit', name: '토끼', emoji: '🐰', color: '#FFF0F5' },
+      { id: 'dragon', name: '용', emoji: '🐉', color: '#E8F5E9' },
+      { id: 'snake', name: '뱀', emoji: '🐍', color: '#E8F8F5' },
+      { id: 'horse', name: '말', emoji: '🐴', color: '#FDF2E9' },
+      { id: 'sheep', name: '양', emoji: '🐑', color: '#F5EEF8' },
+      { id: 'monkey', name: '원숭이', emoji: '🐵', color: '#FDFEFE' },
+      { id: 'rooster', name: '닭', emoji: '🐔', color: '#FEF9E7' },
+      { id: 'dog', name: '개', emoji: '🐶', color: '#FBEEE6' },
+      { id: 'pig', name: '돼지', emoji: '🐷', color: '#FDEDEC' }
+    ];
+
+    // ==========================================
+    // B. 사운드 관리자 (SoundManager)
+    // Web Audio API를 사용해 별도의 사운드 파일 없이 고해상도 신디사이저 효과음 출력
+    // ==========================================
+    class SoundManager {
+      constructor() {
+        this.ctx = null;
+        this.isMuted = false;
+        
+        // 브라우저 첫 터치/클릭에 맞춰 오디오 컨텍스트 Lazy-Loading 설정
+        const initAudio = () => {
+          if (!this.ctx) {
+            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+          }
+          if (this.ctx && this.ctx.state === 'suspended') {
+            this.ctx.resume();
+          }
+        };
+        window.addEventListener('click', initAudio);
+        window.addEventListener('touchstart', initAudio);
+      }
+
+      setMute(mute) {
+        this.isMuted = mute;
+        if (this.ctx && mute && this.ctx.state === 'running') {
+          this.ctx.suspend();
+        } else if (this.ctx && !mute && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      // 사운드 생성 핵심 유틸리티
+      playTone(freq, type, duration, delay = 0) {
+        if (this.isMuted || !this.ctx) return;
+        
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime + delay);
+          
+          gain.gain.setValueAtTime(0.15, this.ctx.currentTime + delay);
+          gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + delay + duration);
+          
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          
+          osc.start(this.ctx.currentTime + delay);
+          osc.stop(this.ctx.currentTime + delay + duration);
+        } catch (e) {
+          console.warn("Audio Context Error", e);
+        }
+      }
+
+      // 효과음 세트
+      playSelect() {
+        this.playTone(523.25, 'triangle', 0.1); // C5
+      }
+
+      playMatch() {
+        this.playTone(587.33, 'sine', 0.08, 0);   // D5
+        this.playTone(698.46, 'sine', 0.08, 0.05); // F5
+        this.playTone(880.00, 'sine', 0.12, 0.1);  // A5
+      }
+
+      playItem() {
+        this.playTone(392.00, 'sawtooth', 0.1, 0); // G4
+        this.playTone(523.25, 'sawtooth', 0.1, 0.08); // C5
+        this.playTone(659.25, 'sawtooth', 0.15, 0.16); // E5
+      }
+
+      playClear() {
+        const notes = [523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, 1046.50];
+        notes.forEach((freq, idx) => {
+          this.playTone(freq, 'sine', 0.15, idx * 0.08);
+        });
+      }
+
+      playFail() {
+        this.playTone(220.00, 'sawtooth', 0.3, 0);
+        this.playTone(164.81, 'sawtooth', 0.5, 0.15);
+      }
+    }
+
+    const soundManager = new SoundManager();
+
+
+    // ==========================================
+    // C. 저장 데이터 관리자 (SaveManager)
+    // LocalStorage를 연동하여 최고기록 및 진행도를 영구 보존
+    // ==========================================
+    class SaveManager {
+      constructor() {
+        this.keyName = "zodiac_match_save_data";
+        this.data = this.load();
+      }
+
+      load() {
+        try {
+          const raw = localStorage.getItem(this.keyName);
+          if (raw) {
+            return JSON.parse(raw);
+          }
+        } catch (e) {
+          console.error("Local storage read fail", e);
+        }
+        // 기본값 반환
+        return {
+          highestStage: 1,
+          highScore: 0,
+          stars: {}, // { stageIndex: starCount }
+          isMuted: false
+        };
+      }
+
+      save() {
+        try {
+          localStorage.setItem(this.keyName, JSON.stringify(this.data));
+        } catch (e) {
+          console.error("Local storage save fail", e);
+        }
+      }
+
+      saveStageResult(stage, score, stars) {
+        // 최고 점수 업데이트
+        if (score > this.data.highScore) {
+          this.data.highScore = score;
+        }
+        // 해금된 최고 스테이지 업데이트
+        if (stage >= this.data.highestStage && stage < 100) {
+          this.data.highestStage = stage + 1;
+        }
+        // 획득 별 수 갱신 (최고 별 기록으로)
+        const prevStars = this.data.stars[stage] || 0;
+        if (stars > prevStars) {
+          this.data.stars[stage] = stars;
+        }
+        this.save();
+      }
+    }
+
+    const saveManager = new SaveManager();
+
+
+    // ==========================================
+    // D. 타일 배치 및 물리 엔진 (TileManager)
+    // 3D 겹침 레이어 알고리즘과 완벽한 3의 배수 검증 클리어 보장 맵 생성
+    // ==========================================
+    class TileManager {
+      constructor(boardElement) {
+        this.board = boardElement;
+        this.tiles = []; // 전체 실시간 타일 배열
+        this.slotTiles = []; // 현재 하단 대기 슬롯 타일들
+        this.onTileSelectCallback = null;
+      }
+
+      // 스테이지 데이터 설계에 맞춰 타일 목록 생성 및 보드 배치
+      generateStageBoard(stageNum) {
+        this.board.innerHTML = '';
+        this.tiles = [];
+        this.slotTiles = [];
+
+        // 1. 스테이지 규격 산출
+        let layerCount = 1;
+        let baseCount = 30; // 타일 총수 기본 (반드시 3의 배수여야 함)
+
+        if (stageNum <= 19) {
+          layerCount = 1;
+          baseCount = 18 + (stageNum * 3); // 21 ~ 75개
+        } else if (stageNum <= 39) {
+          layerCount = 2;
+          baseCount = 51 + ((stageNum - 20) * 3); // 51 ~ 108개
+        } else if (stageNum <= 59) {
+          layerCount = 3;
+          baseCount = 78 + ((stageNum - 40) * 3); // 78 ~ 135개
+        } else if (stageNum <= 79) {
+          layerCount = 4;
+          baseCount = 120 + ((stageNum - 60) * 3); // 120 ~ 177개
+        } else {
+          layerCount = 5;
+          baseCount = 162 + ((stageNum - 80) * 3); // 162 ~ 219개
+        }
+
+        // 제한 범위 체크
+        baseCount = Math.floor(baseCount / 3) * 3; // 3의 배수 안전장치
+
+        // 2. 동물이 완전 대칭적으로 균등하게 등장하도록 타일 리스트 생성
+        const usableAnimalCount = Math.min(12, 4 + Math.floor(stageNum / 10)); // 스테이지가 낮을땐 동물 종류 제한
+        const activeAnimals = ZODIAC_ANIMALS.slice(0, usableAnimalCount);
+        
+        let rawTileTypes = [];
+        const pairsCount = baseCount / 3;
+
+        for (let i = 0; i < pairsCount; i++) {
+          const randAnimal = activeAnimals[i % activeAnimals.length];
+          rawTileTypes.push(randAnimal, randAnimal, randAnimal);
+        }
+
+        // 리스트 완전 섞기
+        this.shuffleArray(rawTileTypes);
+
+        // 3. 3D 다차원 레이어 배치 생성 (바둑판형 그리드 분배 + 랜덤 오프셋 적용)
+        const boardWidth = this.board.clientWidth || 360;
+        const boardHeight = this.board.clientHeight || 400;
+        
+        const tileW = 50; // 타일 물리 크기 (px)
+        const tileH = 60;
+
+        // 레이어별 기준점 분배
+        let tileIndex = 0;
+        for (let layer = 0; layer < layerCount; layer++) {
+          const tilesInLayer = Math.min(rawTileTypes.length - tileIndex, Math.ceil(baseCount / layerCount));
+          
+          // 레이어가 높을수록 중앙에 수렴하며 엇갈리도록 오프셋 계산
+          const xOffset = (layer * 12) - 15;
+          const yOffset = (layer * 14) - 15;
+
+          const cols = Math.ceil(Math.sqrt(tilesInLayer));
+          const rows = Math.ceil(tilesInLayer / cols);
+
+          const startX = (boardWidth - (cols * tileW)) / 2 + xOffset;
+          const startY = (boardHeight - (rows * tileH)) / 2 + yOffset;
+
+          for (let i = 0; i < tilesInLayer; i++) {
+            if (tileIndex >= rawTileTypes.length) break;
+
+            const col = i % cols;
+            const row = Math.floor(i / cols);
+
+            // 타일의 절대 좌표 계산 + 무작위 오프셋(입체감 제공)
+            const rx = startX + (col * tileW) + (Math.sin(tileIndex) * 6);
+            const ry = startY + (row * tileH) + (Math.cos(tileIndex) * 6);
+
+            const tileData = {
+              id: `tile-${tileIndex}`,
+              animal: rawTileTypes[tileIndex],
+              layer: layer,
+              x: Math.max(10, Math.min(boardWidth - tileW - 10, rx)),
+              y: Math.max(10, Math.min(boardHeight - tileH - 10, ry)),
+              width: tileW,
+              height: tileH,
+              isMatched: false,
+              isInSlot: false
+            };
+
+            this.tiles.push(tileData);
+            tileIndex++;
+          }
+        }
+
+        // 4. 레이어 가림 상태(Blocked)를 실시간 판별하여 DOM 그리기
+        this.renderTilesToBoard();
+      }
+
+      // 타일 그리기 및 물리적 상태 렌더링
+      renderTilesToBoard() {
+        this.board.innerHTML = '';
+        
+        // 겹침 검사
+        this.updateOverlappingState();
+
+        this.tiles.forEach(tile => {
+          if (tile.isInSlot || tile.isMatched) return;
+
+          const tileEl = document.createElement('div');
+          tileEl.id = tile.id;
+          tileEl.className = `absolute tile-3d rounded-xl flex flex-col justify-between items-center p-1 border border-amber-300 font-bold cursor-pointer select-none`;
+          
+          // 레이어별 z-index 차등
+          tileEl.style.zIndex = tile.layer * 10 + 5;
+          tileEl.style.width = `${tile.width}px`;
+          tileEl.style.height = `${tile.height}px`;
+          tileEl.style.left = `${tile.x}px`;
+          tileEl.style.top = `${tile.y}px`;
+          tileEl.style.backgroundColor = tile.animal.color;
+
+          // 차단 여부 스타일 적용
+          if (tile.isBlocked) {
+            tileEl.classList.add('blocked');
+          } else {
+            // 미차단 타일에 미세한 둥실 무빙
+            tileEl.classList.add('hover:scale-105');
+          }
+
+          // 귀여운 이모지 및 하단 레이블 구성
+          tileEl.innerHTML = `
+            <span class="text-2xl mt-1 select-none pointer-events-none">${tile.animal.emoji}</span>
+            <span class="text-[8px] text-amber-900/50 leading-none pb-0.5 select-none pointer-events-none">${tile.animal.name}</span>
+          `;
+
+          // 클릭 핸들러 바인딩 (이벤트 위임 대신 개별 핸들러로 정확하게 차단)
+          tileEl.addEventListener('click', () => {
+            if (tile.isBlocked) return;
+            if (this.onTileSelectCallback) {
+              this.onTileSelectCallback(tile);
+            }
+          });
+
+          this.board.appendChild(tileEl);
+        });
+      }
+
+      // 두 타일간의 충돌(겹침) 검출 공식
+      isOverlapping(t1, t2) {
+        // 완전 단순 사각형 충돌 계산 (오프셋 감안)
+        return !(t1.x + t1.width < t2.x ||
+                 t1.x > t2.x + t2.width ||
+                 t1.y + t1.height < t2.y ||
+                 t1.y > t2.y + t2.height);
+      }
+
+      // 최상단 레이어가 아래에 걸쳐있는 모든 레이어 타일을 블락 상태로 활성화
+      updateOverlappingState() {
+        for (let i = 0; i < this.tiles.length; i++) {
+          const t1 = this.tiles[i];
+          t1.isBlocked = false;
+
+          if (t1.isInSlot || t1.isMatched) continue;
+
+          // 자신보다 높은 레이어의 타일들과 겹치는지 체크
+          for (let j = 0; j < this.tiles.length; j++) {
+            const t2 = this.tiles[j];
+            if (t2.isInSlot || t2.isMatched) continue;
+
+            if (t2.layer > t1.layer) {
+              if (this.isOverlapping(t1, t2)) {
+                t1.isBlocked = true;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      // 전체 섞기 아이템 알고리즘 구현
+      shuffleCurrentBoard() {
+        const remainingTiles = this.tiles.filter(t => !t.isInSlot && !t.isMatched);
+        if (remainingTiles.length === 0) return;
+
+        // 위치들(x, y)만 보관
+        const positions = remainingTiles.map(t => ({ x: t.x, y: t.y, layer: t.layer }));
+        this.shuffleArray(positions);
+
+        // 섞은 위치를 대입
+        remainingTiles.forEach((tile, index) => {
+          tile.x = positions[index].x;
+          tile.y = positions[index].y;
+          tile.layer = positions[index].layer;
+        });
+
+        this.renderTilesToBoard();
+      }
+
+      // 유틸리티 배열 셔플러
+      shuffleArray(arr) {
+        for (let i = arr.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+      }
+    }
+
+
+    // ==========================================
+    // E. 전체 게임 상태 코디네이터 (GameManager)
+    // 점수, 콤보, 타이머, 오버레이 조작, 모바일 터치 이벤트 통합 제어
+    // ==========================================
+    class GameManager {
+      constructor() {
+        // 핵심 인스턴스 참조
+        this.tileManager = new TileManager(document.getElementById('tile-board'));
+        
+        // 상태값 관리
+        this.currentStage = 1;
+        this.score = 0;
+        this.combo = 0;
+        this.comboTimer = null;
+        this.timer = 120; // 2분 제한시간 (초)
+        this.timerInterval = null;
+        this.isPaused = false;
+        this.isGameOver = false;
+
+        // 소지한 아이템 개수 (각 스테이지 초기화 시 1개 제공)
+        this.items = {
+          shuffle: 1,
+          bomb: 1,
+          freeze: 1
+        };
+
+        this.initDOM();
+        this.bindEvents();
+      }
+
+      initDOM() {
+        // 로컬스토리지에서 사운드 및 최고 진행도 복원
+        this.currentStage = saveManager.data.highestStage > 100 ? 100 : saveManager.data.highestStage;
+        document.getElementById('main-highest-stage').innerText = saveManager.data.highestStage;
+        document.getElementById('main-high-score').innerText = saveManager.data.highScore;
+        
+        // 사운드 복원 적용
+        soundManager.setMute(saveManager.data.isMuted);
+        this.updateSoundButtonUI();
+
+        // 스테이지 선택 그리드 렌더링
+        this.generateStageSelectionGrid();
+      }
+
+      bindEvents() {
+        // 메인 화면 트리거
+        document.getElementById('btn-start-game').addEventListener('click', () => {
+          this.startStage(this.currentStage);
+        });
+        document.getElementById('btn-open-stages').addEventListener('click', () => {
+          this.switchScreen('screen-stages');
+        });
+        document.getElementById('btn-back-to-main').addEventListener('click', () => {
+          this.switchScreen('screen-main');
+        });
+        document.getElementById('btn-back-to-stages').addEventListener('click', () => {
+          this.pauseTimer();
+          this.switchScreen('screen-stages');
+        });
+
+        // 사운드 토글
+        document.getElementById('btn-toggle-sound').addEventListener('click', () => {
+          const newState = !soundManager.isMuted;
+          soundManager.setMute(newState);
+          saveManager.data.isMuted = newState;
+          saveManager.save();
+          this.updateSoundButtonUI();
+        });
+
+        // 모달 조작 트리거들
+        document.getElementById('btn-resume').addEventListener('click', () => this.togglePause(false));
+        document.getElementById('btn-restart').addEventListener('click', () => {
+          this.togglePause(false);
+          this.startStage(this.currentStage);
+        });
+        document.getElementById('btn-quit').addEventListener('click', () => {
+          this.togglePause(false);
+          this.switchScreen('screen-main');
+        });
+
+        // 결과 모달 트리거들
+        document.getElementById('btn-retry-game').addEventListener('click', () => {
+          document.getElementById('modal-gameover').classList.add('hidden');
+          this.startStage(this.currentStage);
+        });
+        document.getElementById('btn-quit-gameover').addEventListener('click', () => {
+          document.getElementById('modal-gameover').classList.add('hidden');
+          this.switchScreen('screen-main');
+        });
+        document.getElementById('btn-next-stage').addEventListener('click', () => {
+          document.getElementById('modal-clear').classList.add('hidden');
+          this.currentStage = Math.min(100, this.currentStage + 1);
+          this.startStage(this.currentStage);
+        });
+        document.getElementById('btn-quit-clear').addEventListener('click', () => {
+          document.getElementById('modal-clear').classList.add('hidden');
+          this.switchScreen('screen-stages');
+        });
+
+        // 아이템 작동 트리거들
+        document.getElementById('btn-item-shuffle').addEventListener('click', () => this.useItemShuffle());
+        document.getElementById('btn-item-bomb').addEventListener('click', () => this.useItemBomb());
+        document.getElementById('btn-item-freeze').addEventListener('click', () => this.useItemFreeze());
+
+        // 타일 클릭 콜백 수신 대기 및 처리 연동
+        this.tileManager.onTileSelectCallback = (tile) => {
+          this.handleTileSelection(tile);
+        };
+      }
+
+      updateSoundButtonUI() {
+        const icon = document.getElementById('icon-sound');
+        const btnText = document.getElementById('btn-toggle-sound');
+        if (soundManager.isMuted) {
+          icon.className = "fas fa-volume-mute text-red-500";
+          btnText.innerHTML = `<i class="fas fa-volume-mute text-red-500" id="icon-sound"></i> 소리 OFF`;
+        } else {
+          icon.className = "fas fa-volume-up text-green-600";
+          btnText.innerHTML = `<i class="fas fa-volume-up text-green-600" id="icon-sound"></i> 소리 ON`;
+        }
+      }
+
+      switchScreen(targetScreenId) {
+        // 제어할 핵심 스크린 3개 지정
+        const screens = ['screen-main', 'screen-stages', 'screen-game'];
+        screens.forEach(s => {
+          const el = document.getElementById(s);
+          if (el) {
+            if (s === targetScreenId) {
+              el.classList.remove('hidden');
+            } else {
+              el.classList.add('hidden');
+            }
+          }
+        });
+        if (targetScreenId === 'screen-stages') {
+          this.generateStageSelectionGrid(); // 실시간 해금 여부 리페인트
+        }
+      }
+
+      // 스테이지 100개 동적 생성기
+      generateStageSelectionGrid() {
+        const list = document.getElementById('stage-list-container');
+        list.innerHTML = '';
+
+        const highest = saveManager.data.highestStage;
+        
+        // 획득 별 총합 계산
+        let totalStars = 0;
+        Object.values(saveManager.data.stars).forEach(v => totalStars += v);
+        document.getElementById('total-stars-count').innerText = totalStars;
+
+        for (let i = 1; i <= 100; i++) {
+          const isUnlocked = i <= highest;
+          const starsEarned = saveManager.data.stars[i] || 0;
+
+          const card = document.createElement('button');
+          card.disabled = !isUnlocked;
+          
+          if (isUnlocked) {
+            card.className = "flex flex-col justify-between items-center p-2 bg-gradient-to-b from-amber-50 to-orange-100/50 hover:from-amber-100 hover:to-orange-200 border-2 border-orange-200 rounded-2xl cursor-pointer shadow-sm transition-transform active:scale-95 text-center";
+            
+            // 별 드로잉
+            let starHTML = '';
+            for (let s = 0; s < 3; s++) {
+              starHTML += `<span class="${s < starsEarned ? 'text-amber-500' : 'text-gray-300'} text-[10px]">★</span>`;
+            }
+
+            card.innerHTML = `
+              <span class="game-font font-bold text-lg text-amber-950">${i}</span>
+              <div class="flex justify-center gap-0.5 mt-1">${starHTML}</div>
+            `;
+            
+            card.addEventListener('click', () => {
+              this.startStage(i);
+            });
+          } else {
+            // 미해금 잠금 스타일
+            card.className = "flex flex-col justify-center items-center p-3 bg-gray-100 border-2 border-gray-200 rounded-2xl text-gray-400 cursor-not-allowed";
+            card.innerHTML = `
+              <i class="fas fa-lock text-sm"></i>
+              <span class="text-[10px] mt-1 font-bold">${i}</span>
+            `;
+          }
+          list.appendChild(card);
+        }
+      }
+
+      // ==========================================
+      // F. 핵심 인게임 시스템 흐름 제어부
+      // ==========================================
+      startStage(stageNumber) {
+        this.currentStage = stageNumber;
+        this.score = 0;
+        this.combo = 0;
+        this.timer = 120; // 2분 리셋
+        this.isPaused = false;
+        this.isGameOver = false;
+
+        // 아이템 각 1개 충전 제공
+        this.items = { shuffle: 1, bomb: 1, freeze: 1 };
+
+        // UI 바인딩
+        document.getElementById('current-stage-num').innerText = stageNumber;
+        document.getElementById('game-score').innerText = '0';
+        document.getElementById('combo-count').innerText = '0';
+        
+        // 레이어 텍스트 패치
+        const badge = document.getElementById('layer-badge');
+        if (stageNumber <= 19) badge.innerText = "1단 구조";
+        else if (stageNumber <= 39) badge.innerText = "2단 구조";
+        else if (stageNumber <= 59) badge.innerText = "3단 구조";
+        else if (stageNumber <= 79) badge.innerText = "4단 구조";
+        else badge.innerText = "5단 구조";
+
+        // 아이템 개수 배지 업데이트
+        this.updateItemCountsUI();
+
+        // 매칭 트레이 비우기
+        const container = document.getElementById('matching-slot-container');
+        container.innerHTML = '';
+        this.tileManager.slotTiles = [];
+
+        // 보드 타일 생성
+        this.tileManager.generateStageBoard(stageNumber);
+
+        // 타이머 시동
+        this.startTimer();
+        
+        // 이펙트 캔버스 초기화
+        particles = [];
+
+        // 화면을 즉시 인게임 플레이 스크린으로 격리 전환
+        this.switchScreen('screen-game');
+      }
+
+      // 1초 단위 인터벌 타이머
+      startTimer() {
+        this.pauseTimer();
+        this.timerInterval = setInterval(() => {
+          if (this.isPaused || this.isGameOver) return;
+          this.timer--;
+          this.updateTimerUI();
+
+          if (this.timer <= 0) {
+            this.triggerGameOver("시간 초과! 다음엔 더 빨리 매칭해 보세요.");
+          }
+        }, 1000);
+        this.updateTimerUI();
+      }
+
+      pauseTimer() {
+        if (this.timerInterval) {
+          clearInterval(this.timerInterval);
+          this.timerInterval = null;
+        }
+      }
+
+      updateTimerUI() {
+        const minutes = Math.floor(this.timer / 60);
+        const seconds = this.timer % 60;
+        const timerText = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        
+        const textElement = document.getElementById('game-timer');
+        const boxElement = document.getElementById('timer-box');
+        
+        textElement.innerText = timerText;
+
+        // 실시간 게이지 연동 (120초 기준 역산)
+        const percent = (this.timer / 120) * 100;
+        document.getElementById('time-progress-bar').style.width = `${percent}%`;
+
+        // 실시간 획득 예상 별 차등 갱신
+        const starIndicators = document.getElementById('live-stars').children;
+        if (this.timer >= 60) {
+          starIndicators[0].className = "text-amber-400 text-sm";
+          starIndicators[1].className = "text-amber-400 text-sm";
+          starIndicators[2].className = "text-amber-400 text-sm";
+        } else if (this.timer >= 30) {
+          starIndicators[0].className = "text-amber-400 text-sm";
+          starIndicators[1].className = "text-amber-400 text-sm";
+          starIndicators[2].className = "text-gray-300 text-sm";
+        } else {
+          starIndicators[0].className = "text-amber-400 text-sm";
+          starIndicators[1].className = "text-gray-300 text-sm";
+          starIndicators[2].className = "text-gray-300 text-sm";
+        }
+
+        // 위급 경고 (30초 미만 시 붉은색)
+        if (this.timer < 30) {
+          boxElement.className = "flex items-center gap-1.5 px-3 py-1 bg-red-100 border-2 border-red-500 rounded-full shadow-sm animate-pulse";
+          textElement.className = "font-black text-lg text-red-600 tabular-nums";
+        } else {
+          boxElement.className = "flex items-center gap-1.5 px-3 py-1 bg-white border-2 border-orange-200 rounded-full shadow-sm";
+          textElement.className = "font-black text-lg text-orange-900 tabular-nums";
+        }
+      }
+
+      // 일시정지 오버레이 토글
+      togglePause(forceState) {
+        this.isPaused = forceState !== undefined ? forceState : !this.isPaused;
+        const modal = document.getElementById('modal-pause');
+        if (this.isPaused) {
+          modal.classList.remove('hidden');
+          this.pauseTimer();
+        } else {
+          modal.classList.add('hidden');
+          this.startTimer();
+        }
+      }
+
+      // ==========================================
+      // G. 3매치 로직의 심장부 (Matching Engine)
+      // ==========================================
+      handleTileSelection(tile) {
+        if (this.isGameOver || this.isPaused) return;
+
+        // 슬롯 수용 한계 체크 (동작 중 안전장치)
+        if (this.tileManager.slotTiles.length >= 8) return;
+
+        soundManager.playSelect();
+
+        // 1. 타일을 보드에서 제거하고 트레이 소속으로 상태 전이
+        tile.isInSlot = true;
+        this.tileManager.renderTilesToBoard(); // 보드 갱신
+
+        // 2. 슬롯 배열에 삽입하되, 정렬을 위해 같은 동물 옆에 삽입
+        const slotTiles = this.tileManager.slotTiles;
+        const targetIndex = slotTiles.findIndex(t => t.animal.id === tile.animal.id);
+        
+        if (targetIndex !== -1) {
+          // 일치하는 동물이 있으면 그 옆에 밀어넣기
+          slotTiles.splice(targetIndex, 0, tile);
+        } else {
+          // 없으면 우측 맨뒤 삽입
+          slotTiles.push(tile);
+        }
+
+        // 3. 트레이 DOM 렌더링
+        this.renderMatchingSlotUI();
+
+        // 4. 같은 동물 3개 매칭 체크
+        this.checkMatchSuccess();
+      }
+
+      renderMatchingSlotUI() {
+        const container = document.getElementById('matching-slot-container');
+        container.innerHTML = '';
+
+        const slotTiles = this.tileManager.slotTiles;
+        document.getElementById('slot-indicator').innerText = `${slotTiles.length} / 8`;
+
+        slotTiles.forEach((tile, index) => {
+          const el = document.createElement('div');
+          el.className = `w-11 h-11 rounded-lg border border-amber-300 flex items-center justify-center text-xl shadow-sm tile-slide-in relative select-none`;
+          el.style.backgroundColor = tile.animal.color;
+          el.innerHTML = tile.animal.emoji;
+
+          container.appendChild(el);
+        });
+      }
+
+      // 3개 일치 매치 판별 및 연쇄 제거
+      checkMatchSuccess() {
+        const slotTiles = this.tileManager.slotTiles;
+        
+        // 빈도 계산
+        const countMap = {};
+        slotTiles.forEach(t => {
+          countMap[t.animal.id] = (countMap[t.animal.id] || 0) + 1;
+        });
+
+        // 3개 모인 십이지신 동물 찾기
+        let matchedId = null;
+        for (const [id, count] of Object.entries(countMap)) {
+          if (count >= 3) {
+            matchedId = id;
+            break;
+          }
+        }
+
+        if (matchedId) {
+          soundManager.playMatch();
+
+          // 1. 매칭 콤보 증가 및 수치 계산
+          this.combo++;
+          this.resetComboCooldown();
+
+          let comboMultiplier = 1;
+          if (this.combo === 2) comboMultiplier = 1.5;
+          else if (this.combo === 3) comboMultiplier = 2.0;
+          else if (this.combo >= 4) comboMultiplier = 3.0;
+
+          const points = Math.floor(100 * comboMultiplier);
+          this.score += points;
+          document.getElementById('game-score').innerText = this.score;
+
+          // 콤보 팝업 드로잉 연동
+          document.getElementById('combo-count').innerText = `${this.combo}`;
+          
+          // 매칭된 3개의 타일 추출 및 물리 제거 처리
+          let matchCount = 0;
+          this.tileManager.slotTiles = slotTiles.filter(tile => {
+            if (tile.animal.id === matchedId && matchCount < 3) {
+              tile.isMatched = true;
+              
+              // 폭발 파티클 이펙트 방출
+              const trayRect = document.getElementById('matching-slot-tray').getBoundingClientRect();
+              const containerRect = document.getElementById('game-container').getBoundingClientRect();
+              const particleX = trayRect.left - containerRect.left + (trayRect.width / 2);
+              const particleY = trayRect.top - containerRect.top + (trayRect.height / 2);
+              createExplosion(particleX, particleY, tile.animal.color);
+
+              matchCount++;
+              return false; // 필터링하여 슬롯에서 방출
+            }
+            return true;
+          });
+
+          // 부드러운 애니메이션을 동반한 트레이 재입력
+          setTimeout(() => {
+            this.renderMatchingSlotUI();
+            this.checkVictoryCondition();
+          }, 150);
+
+        } else {
+          // 매치 실패 시, 슬롯이 가득 찼으면 (8칸 도달) 게임 오버
+          if (slotTiles.length >= 8) {
+            // 보드 전체가 비정상적으로 꽉 차기 전에 최후의 흔들림 적용 후 아웃
+            document.getElementById('matching-slot-tray').classList.add('shake-anim');
+            setTimeout(() => {
+              document.getElementById('matching-slot-tray').classList.remove('shake-anim');
+              this.triggerGameOver("슬롯이 가득 찼습니다! 타일 제거 폭탄을 사용해보세요.");
+            }, 400);
+          }
+        }
+      }
+
+      // 콤보 리셋 쿨다운 타이머
+      resetComboCooldown() {
+        if (this.comboTimer) clearTimeout(this.comboTimer);
+        this.comboTimer = setTimeout(() => {
+          this.combo = 0;
+          document.getElementById('combo-count').innerText = '0';
+        }, 5000); // 5초간 무입력 시 콤보가 리셋됩니다.
+      }
+
+      // 승리 조건 검사 (보드에 남은 활성 타일 전무할 때)
+      checkVictoryCondition() {
+        const remainingActive = this.tileManager.tiles.filter(t => !t.isMatched);
+        
+        if (remainingActive.length === 0) {
+          this.triggerVictory();
+        }
+      }
+
+      // ==========================================
+      // H. 게임 마감 처리 및 로컬 저장 연계 (Win/Lose)
+      // ==========================================
+      triggerVictory() {
+        this.isGameOver = true;
+        this.pauseTimer();
+        soundManager.playClear();
+
+        // 획득 별 수 계산
+        let stars = 1;
+        if (this.timer >= 60) stars = 3;
+        else if (this.timer >= 30) stars = 2;
+
+        // 점수 기록 저장 및 해금 진행도 보존
+        saveManager.saveStageResult(this.currentStage, this.score, stars);
+
+        // 결과창 표시 설정
+        document.getElementById('clear-score-val').innerText = `${this.score}점`;
+        
+        const minutes = Math.floor(this.timer / 60);
+        const seconds = this.timer % 60;
+        document.getElementById('clear-time-val').innerText = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+        // 별 아이콘 활성화 드로잉
+        const starsContainer = document.getElementById('clear-stars');
+        starsContainer.innerHTML = '';
+        for (let i = 0; i < 3; i++) {
+          const s = document.createElement('span');
+          s.className = i < stars ? "text-amber-400 text-5xl animate-bounce" : "text-gray-300 text-5xl";
+          s.style.animationDelay = `${i * 0.15}s`;
+          s.innerText = '★';
+          starsContainer.appendChild(s);
+        }
+
+        // 폭죽 이펙트 무한 루프 생성
+        const containerRect = document.getElementById('game-container').getBoundingClientRect();
+        for (let j = 0; j < 6; j++) {
+          setTimeout(() => {
+            createExplosion(
+              Math.random() * containerRect.width, 
+              Math.random() * (containerRect.height * 0.6), 
+              `hsl(${Math.random() * 360}, 100%, 60%)`
+            );
+          }, j * 300);
+        }
+
+        document.getElementById('modal-clear').classList.remove('hidden');
+      }
+
+      triggerGameOver(reasonText) {
+        this.isGameOver = true;
+        this.pauseTimer();
+        soundManager.playFail();
+
+        document.getElementById('gameover-reason').innerText = reasonText;
+        document.getElementById('gameover-score').innerText = `${this.score}점`;
+        document.getElementById('modal-gameover').classList.remove('hidden');
+      }
+
+      // ==========================================
+      // I. 아이템 기능 정교 구현부
+      // ==========================================
+      updateItemCountsUI() {
+        document.getElementById('item-shuffle-count').innerText = this.items.shuffle;
+        document.getElementById('item-bomb-count').innerText = this.items.bomb;
+        document.getElementById('item-freeze-count').innerText = this.items.freeze;
+      }
+
+      // 1. 전체 섞기 아이콘 (🔀)
+      useItemShuffle() {
+        if (this.isGameOver || this.isPaused) return;
+        if (this.items.shuffle <= 0) return;
+
+        this.items.shuffle--;
+        this.updateItemCountsUI();
+        soundManager.playItem();
+
+        this.tileManager.shuffleCurrentBoard();
+      }
+
+      // 2. 타일 제거 폭탄 (💣) - 슬롯 내 맨 오른쪽 타일 1개를 구출해 제거
+      useItemBomb() {
+        if (this.isGameOver || this.isPaused) return;
+        if (this.items.bomb <= 0) return;
+
+        const slotTiles = this.tileManager.slotTiles;
+        if (slotTiles.length === 0) return; // 슬롯에 타일이 한 개도 없으면 사용 불가
+
+        this.items.bomb--;
+        this.updateItemCountsUI();
+        soundManager.playItem();
+
+        // 가장 최근에 밀어 넣은 타일 1개 지정 구출
+        const removedTile = slotTiles.pop();
+        removedTile.isMatched = true; // 강제 소멸 판정
+
+        const trayRect = document.getElementById('matching-slot-tray').getBoundingClientRect();
+        const containerRect = document.getElementById('game-container').getBoundingClientRect();
+        createExplosion(
+          trayRect.left - containerRect.left + (trayRect.width / 2),
+          trayRect.top - containerRect.top + (trayRect.height / 2),
+          '#ef4444'
+        );
+
+        this.renderMatchingSlotUI();
+        this.tileManager.renderTilesToBoard();
+        this.checkVictoryCondition(); // 혹시 마지막 타일 제거된 경우 대응
+      }
+
+      // 3. 시간 정지 아이콘 (⏸️) - 15초 동안 일시 중지
+      useItemFreeze() {
+        if (this.isGameOver || this.isPaused) return;
+        if (this.items.freeze <= 0) return;
+
+        this.items.freeze--;
+        this.updateItemCountsUI();
+        soundManager.playItem();
+
+        // 15초 타임 정지 이펙트 시작
+        this.pauseTimer();
+        
+        // 타이머 상단 배경을 일시적으로 파란빛 얼음 색깔로 래핑
+        const timerBox = document.getElementById('timer-box');
+        const origClass = timerBox.className;
+        timerBox.className = "flex items-center gap-1.5 px-3 py-1 bg-cyan-100 border-2 border-cyan-400 rounded-full shadow-sm animate-pulse";
+        
+        let freezeRemaining = 15;
+        const countdownElement = document.getElementById('game-timer');
+        const originalText = countdownElement.innerText;
+        
+        const freezeInterval = setInterval(() => {
+          if (this.isGameOver) {
+            clearInterval(freezeInterval);
+            return;
+          }
+          freezeRemaining--;
+          countdownElement.innerText = `❄️ ${freezeRemaining}s`;
+
+          if (freezeRemaining <= 0) {
+            clearInterval(freezeInterval);
+            timerBox.className = origClass;
+            this.startTimer(); // 시간 복귀
+          }
+        }, 1000);
+      }
+    }
+
+
+    // ==========================================
+    // J. 고해상도 경량 캔버스 입자 물리 엔진 (Particles)
+    // ==========================================
+    const canvas = document.getElementById('effect-canvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+
+    // 모바일 캔버스 DPR 해상도 맞춤식 자동 리사이징
+    function resizeCanvas() {
+      const container = document.getElementById('game-container');
+      canvas.width = container.clientWidth;
+      canvas.height = container.clientHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener('load', () => {
+      resizeCanvas();
+      // 게임 가동 시작
+      window.gameEngine = new GameManager();
+    });
+
+    class Particle {
+      constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.size = Math.random() * 5 + 4;
+        this.speedX = Math.random() * 8 - 4;
+        this.speedY = Math.random() * -8 - 2;
+        this.gravity = 0.35;
+        this.alpha = 1;
+        this.decay = Math.random() * 0.02 + 0.015;
+      }
+
+      update() {
+        this.x += this.speedX;
+        this.y += this.speedY;
+        this.speedY += this.gravity;
+        this.alpha -= this.decay;
+      }
+
+      draw() {
+        ctx.save();
+        ctx.globalAlpha = this.alpha;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        // 사각형 및 동그라미 입자 교차 생성
+        if (Math.random() > 0.5) {
+          ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        } else {
+          ctx.rect(this.x - this.size, this.y - this.size, this.size * 2, this.size * 2);
+        }
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    function createExplosion(x, y, color) {
+      for (let i = 0; i < 24; i++) {
+        particles.push(new Particle(x, y, color));
+      }
+    }
+
+    // 60FPS 애니메이션 루프 통합
+    function animate() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      particles.forEach((p, idx) => {
+        p.update();
+        p.draw();
+        if (p.alpha <= 0) {
+          particles.splice(idx, 1);
+        }
+      });
+
+      requestAnimationFrame(animate);
+    }
+    animate();
+  </script>
+</body>
+</html>
